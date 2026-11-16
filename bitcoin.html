@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title>BTC Multi-Exchange Order Flow</title>
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-NZZ87R5P"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+</script>
+
+        <style>
+            :root {
+                --bg: #080b10;
+                --panel: #0e131b;
+                --line: #1b2431;
+                --tx: #d8e0ec;
+                --dim: #7a8799;
+                --buy: #00F090;
+                --sell: #FF3B5C;
+                --ui: 'Manrope',system-ui,sans-serif;
+                --mono: 'JetBrains Mono',ui-monospace,Menlo,monospace;
+                box-sizing: border-box;
+                padding-top: env(safe-area-inset-top,0px);
+                padding-bottom: env(safe-area-inset-bottom,0px);
+                color-scheme: dark
+            }
+
+            *,*::before,*::after {
+                box-sizing: inherit
+            }
+
+            html,body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--tx);
+                font-family: var(--ui);
+                height: 100%
+            }
+
+            body {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 12px;
+                min-height: 100%
+            }
+
+            header {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 10px 22px
+            }
+
+            .brand b {
+                font-size: 18px;
+                display: block
+            }
+
+            .brand span {
+                font-size: 12px;
+                color: var(--dim)
+            }
+
+            .price {
+                font-family: var(--mono);
+                font-size: 28px;
+                font-weight: 500;
+                letter-spacing: -.5px;
+                min-width: 160px
+            }
+
+            .price small {
+                display: block;
+                font-size: 12px;
+                letter-spacing: 0;
+                color: var(--dim)
+            }
+
+            #px.up {
+                color: var(--buy)
+            }
+
+            #px.down {
+                color: var(--sell)
+            }
+
+            .grp {
+                display: flex;
+                gap: 4px;
+                align-items: center;
+                flex-wrap: wrap
+            }
+
+            .grp label {
+                font-size: 12px;
+                color: var(--dim);
+                margin-right: 4px
+            }
+
+            .grp b {
+                font: 500 12px var(--mono);
+                min-width: 72px
+            }
+
+            button,select {
+                background: var(--panel);
+                color: var(--tx);
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                padding: 6px 11px;
+                font: 600 13px var(--ui);
+                cursor: pointer
+            }
+
+            button.on {
+                border-color: var(--buy);
+                color: var(--buy)
+            }
+
+            button:focus-visible,select:focus-visible,input:focus-visible {
+                outline: 2px solid var(--buy);
+                outline-offset: 2px
+            }
+
+            input[type=range] {
+                accent-color: var(--buy);
+                width: 130px
+            }
+
+            .status {
+                margin-left: auto;
+                font-size: 12px;
+                color: var(--dim);
+                display: flex;
+                align-items: center;
+                gap: 6px
+            }
+
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--dim);
+                display: inline-block
+            }
+
+            .dot.live {
+                background: var(--buy);
+                box-shadow: 0 0 8px var(--buy)
+            }
+
+            .dot.demo {
+                background: #ffb020
+            }
+
+            .ohlc {
+                font: 500 12px var(--mono);
+                color: var(--dim);
+                min-height: 18px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis
+            }
+
+            .ohlc.up {
+                color: var(--buy)
+            }
+
+            .ohlc.down {
+                color: var(--sell)
+            }
+
+            .layout {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 1fr 320px;
+                gap: 10px;
+                min-height: 480px
+            }
+
+            .card {
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                overflow: hidden;
+                position: relative;
+                min-height: 0
+            }
+
+            #cv {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                display: block;
+                cursor: crosshair;
+                touch-action: none
+            }
+
+            .side {
+                display: flex;
+                flex-direction: column;
+                padding-bottom: 4px
+            }
+
+            .rl {
+                display: flex;
+                justify-content: space-between;
+                font: 500 12px var(--mono);
+                padding: 0 12px 6px
+            }
+
+            .g {
+                color: var(--buy)
+            }
+
+            .r {
+                color: var(--sell)
+            }
+
+            .bar {
+                display: flex;
+                height: 8px;
+                margin: 0 12px;
+                border-radius: 4px;
+                overflow: hidden;
+                background: var(--line)
+            }
+
+            .bar i {
+                display: block;
+                transition: width .25s
+            }
+
+            #rb {
+                background: var(--buy);
+                width: 50%
+            }
+
+            #rs {
+                background: var(--sell);
+                width: 50%
+            }
+
+            .exs {
+                padding: 10px 12px;
+                font: 12px var(--mono);
+                display: grid;
+                gap: 5px
+            }
+
+            .ex {
+                display: grid;
+                grid-template-columns: 70px 1fr 74px;
+                gap: 8px;
+                align-items: center
+            }
+
+            .ex .m {
+                height: 6px;
+                background: var(--line);
+                border-radius: 3px;
+                overflow: hidden;
+                display: flex
+            }
+
+            .ex .m i {
+                display: block
+            }
+
+            .ex em {
+                font-style: normal;
+                text-align: right
+            }
+
+            h2 {
+                margin: 0;
+                padding: 8px 12px;
+                font-size: 13px;
+                border-top: 1px solid var(--line);
+                border-bottom: 1px solid var(--line);
+                display: flex;
+                justify-content: space-between
+            }
+
+            h2 span {
+                color: var(--dim);
+                font-weight: 500
+            }
+
+            #tape {
+                flex: 1;
+                overflow-y: auto;
+                font: 12px var(--mono);
+                min-height: 120px
+            }
+
+            .row {
+                display: grid;
+                grid-template-columns: 26px 62px 1fr 70px;
+                gap: 6px;
+                padding: 3px 12px;
+                align-items: center
+            }
+
+            .row .c {
+                display: flex;
+                justify-content: center
+            }
+
+            .row .c i {
+                display: block;
+                border-radius: 50%
+            }
+
+            .row.b {
+                color: var(--buy)
+            }
+
+            .row.s {
+                color: var(--sell)
+            }
+
+            .row span:last-child {
+                text-align: right;
+                color: var(--tx);
+                opacity: .85
+            }
+
+            .hint {
+                margin: 0;
+                font-size: 11px;
+                color: var(--dim);
+                text-align: center
+            }
+
+            @media(max-width: 860px) {
+                .layout {
+                    grid-template-columns:1fr;
+                    grid-template-rows: 440px auto
+                }
+
+                .status {
+                    margin-left: 0
+                }
+            }
+
+            @media(prefers-reduced-motion:reduce) {
+                .bar i {
+                    transition: none
+                }
+            }
+
+            .note {
+                font-size: 11px;
+                color: var(--dim);
+                margin-left: 6px
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <b>BTC Order Flow</b>
+                <span>Binance · Coinbase · Kraken · Bybit · OKX</span>
+            </div>
+            <div class="price">
+                <span id="px">--</span>
+                <small id="chg">Waiting for trades</small>
+            </div>
+            <div class="grp" id="ivs" role="group" aria-label="Candle interval"></div>
+            <div class="grp">
+                <label for="win">Flow window</label>
+                <select id="win">
+                    <option value="30">30s</option>
+                    <option value="60" selected>1m</option>
+                    <option value="300">5m</option>
+                </select>
+            </div>
+            <div class="grp">
+                <label for="th">Big order ≥</label>
+                <input type="range" id="th" min="0.1" max="10" step="0.05" value="0.3">
+                <b id="thv">0.30 BTC</b>
+            </div>
+            <div class="grp">
+                <button id="clr" title="Delete the big trades saved in this browser">Clear saved</button>
+                <span class="note" id="note"></span>
+            </div>
+            <div class="status">
+                <span class="dot" id="dot"></span>
+                <span id="st">Connecting</span>
+            </div>
+        </header>
+        <div class="ohlc" id="ohlc">&nbsp;</div>
+        <div class="layout">
+            <div class="card chart">
+                <canvas id="cv"></canvas>
+            </div>
+            <aside class="card side">
+                <div class="rl">
+                    <b id="bp" class="g">Buy 50%</b>
+                    <b id="sp" class="r">Sell 50%</b>
+                </div>
+                <div class="bar">
+                    <i id="rb"></i>
+                    <i id="rs"></i>
+                </div>
+                <div id="exs" class="exs"></div>
+                <h2>
+                    Big orders <span id="bc">0</span>
+                </h2>
+                <div id="tape"></div>
+            </aside>
+        </div>
+        <p class="hint">Scroll to zoom · drag to pan · double-click for live · green circle at the bottom of a candle = big buys pushing up · red circle at the top = big sells pushing down · circles are saved in this browser</p>
+        <script>
+            const $ = id => document.getElementById(id);
+            const MS = {
+                '1m': 6e4,
+                '5m': 3e5,
+                '15m': 9e5,
+                '1h': 36e5,
+                '4h': 144e5,
+                '1d': 864e5
+            };
+            // Each exchange: public trade stream + parser returning {p: price, q: BTC size, s: 'b'|'s' = taker (aggressor) side}
+            const EX = [{
+                n: 'Binance',
+                url: 'wss://stream.binance.com:9443/ws/btcusdt@aggTrade',
+                parse: d => d.e === 'aggTrade' ? [{
+                    p: +d.p,
+                    q: +d.q,
+                    s: d.m ? 's' : 'b'
+                }] : []
+            }, {
+                n: 'Coinbase',
+                url: 'wss://ws-feed.exchange.coinbase.com',
+                sub: {
+                    type: 'subscribe',
+                    product_ids: ['BTC-USD'],
+                    channels: ['matches']
+                },
+                parse: d => d.type === 'match' ? [{
+                    p: +d.price,
+                    q: +d.size,
+                    s: d.side === 'buy' ? 's' : 'b'
+                }] : []
+            }, // coinbase reports the maker side
+            {
+                n: 'Kraken',
+                url: 'wss://ws.kraken.com/v2',
+                sub: {
+                    method: 'subscribe',
+                    params: {
+                        channel: 'trade',
+                        symbol: ['BTC/USD']
+                    }
+                },
+                parse: d => d.channel === 'trade' && d.type === 'update' ? d.data.map(x => ({
+                    p: x.price,
+                    q: x.qty,
+                    s: x.side === 'buy' ? 'b' : 's'
+                })) : []
+            }, {
+                n: 'Bybit',
+                url: 'wss://stream.bybit.com/v5/public/spot',
+                sub: {
+                    op: 'subscribe',
+                    args: ['publicTrade.BTCUSDT']
+                },
+                ping: '{"op":"ping"}',
+                parse: d => d.topic && d.topic.startsWith('publicTrade') ? d.data.map(x => ({
+                    p: +x.p,
+                    q: +x.v,
+                    s: x.S === 'Buy' ? 'b' : 's'
+                })) : []
+            }, {
+                n: 'OKX',
+                url: 'wss://ws.okx.com:8443/ws/v5/public',
+                sub: {
+                    op: 'subscribe',
+                    args: [{
+                        channel: 'trades',
+                        instId: 'BTC-USDT'
+                    }]
+                },
+                ping: 'ping',
+                parse: d => d.arg && d.arg.channel === 'trades' && d.data ? d.data.map(x => ({
+                    p: +x.px,
+                    q: +x.sz,
+                    s: x.side === 'buy' ? 'b' : 's'
+                })) : []
+            }];
+            const KEY = 'btcflow.v2'
+              , MIN = 0.1
+              , MAXO = 20000;
+            let iv = '1m'
+              , candles = []
+              , n = 120
+              , off = 0
+              , gen = 0
+              , flow = []
+              , orders = []
+              , tq = []
+              , thr = 0.3
+              , lastBin = 0
+              , lastPx = null
+              , mouse = null
+              , got = false
+              , seq = 0
+              , S = {
+                b: 0,
+                s: 0
+            }
+              , key = KEY
+              , lastSeen = 0
+              , agg = new Map()
+              , sessionStart = Date.now();
+
+            // ---------- helpers / UI ----------
+            const fmt = (x, d=2) => x.toLocaleString('en-US', {
+                minimumFractionDigits: d,
+                maximumFractionDigits: d
+            });
+            const mix = (a, b, t) => a.map( (v, i) => Math.round(v + (b[i] - v) * t));
+            const BL = [167, 243, 208]
+              , BN = [0, 240, 144]
+              , SL = [253, 164, 175]
+              , SN = [255, 59, 92];
+            const colr = (buy, t, a0, a1) => 'rgba(' + mix(buy ? BL : SL, buy ? BN : SN, t) + ',' + (a0 + (a1 - a0) * t) + ')';
+            const setStatus = (k, t) => {
+                $('dot').className = 'dot ' + k;
+                $('st').textContent = t
+            }
+            ;
+            const fit = c => {
+                const d = devicePixelRatio || 1
+                  , r = c.getBoundingClientRect();
+                c.width = r.width * d;
+                c.height = r.height * d;
+                c.getContext('2d').setTransform(d, 0, 0, d, 0, 0);
+                return r
+            }
+            ;
+            Object.keys(MS).forEach(k => {
+                const b = document.createElement('button');
+                b.textContent = k;
+                b.dataset.i = k;
+                b.onclick = () => {
+                    iv = k;
+                    n = 120;
+                    off = 0;
+                    mark();
+                    loadHistory(gen);
+                    save()
+                }
+                ;
+                $('ivs').appendChild(b)
+            }
+            );
+            const mark = () => document.querySelectorAll('#ivs button').forEach(b => b.classList.toggle('on', b.dataset.i === iv));
+            const setThr = v => {
+                thr = v;
+                $('th').value = v;
+                $('thv').textContent = v.toFixed(2) + ' BTC'
+            }
+            ;
+            $('th').oninput = e => {
+                setThr(+e.target.value);
+                save()
+            }
+            ;
+            $('win').onchange = save;
+            $('clr').onclick = () => {
+                orders = [];
+                tq = [];
+                $('tape').innerHTML = '';
+                try {
+                    localStorage.removeItem(key)
+                } catch (e) {}
+                $('note').textContent = 'Saved big trades cleared'
+            }
+            ;
+
+            // ---------- persistence: big trades survive reloads / closing the tab ----------
+            function readStore(k) {
+                try {
+                    return JSON.parse(localStorage.getItem(k) || 'null')
+                } catch (e) {
+                    return null
+                }
+            }
+            const unpack = a => ({
+                t: a[0],
+                p: a[1],
+                q: a[2],
+                s: a[3] ? 'b' : 's',
+                ex: EX[a[4]] ? EX[a[4]].n : 'Binance',
+                id: seq++
+            });
+            function save() {
+                try {
+                    localStorage.setItem(key, JSON.stringify({
+                        o: orders.map(o => [o.t, +o.p.toFixed(2), +o.q.toFixed(4), o.s === 'b' ? 1 : 0, EX.findIndex(e => e.n === o.ex)]),
+                        l: lastSeen,
+                        iv,
+                        th: thr,
+                        w: $('win').value
+                    }))
+                } catch (e) {}
+            }
+            function restore() {
+                const d = readStore(key);
+                if (!d)
+                    return;
+                orders = (d.o || []).map(unpack).sort( (a, b) => a.t - b.t);
+                lastSeen = d.l || 0;
+                if (MS[d.iv])
+                    iv = d.iv;
+                if (d.th)
+                    setThr(d.th);
+                if (d.w)
+                    $('win').value = d.w;
+                tq = orders.filter(o => o.q >= thr).slice(-25);
+                if (orders.length)
+                    $('note').textContent = `Restored ${orders.length.toLocaleString()} saved trades`;
+            }
+            addEventListener('pagehide', save);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden)
+                    save()
+            }
+            );
+            setInterval(save, 5000);
+            // fill the gap while the page was closed (Binance public history; other exchanges have no free history feed)
+            async function backfill(my, from) {
+                let id = null
+                  , added = 0;
+                try {
+                    for (let i = 0; i < 40; i++) {
+                        const u = 'https://api.binance.com/api/v3/aggTrades?symbol=BTCUSDT&limit=1000&' + (id === null ? 'startTime=' + from : 'fromId=' + id);
+                        const r = await fetch(u);
+                        if (!r.ok || my !== gen)
+                            break;
+                        const a = await r.json();
+                        if (!a.length)
+                            break;
+                        a.forEach(x => {
+                            if (+x.q >= MIN && x.T < sessionStart) {
+                                orders.push({
+                                    t: x.T,
+                                    p: +x.p,
+                                    q: +x.q,
+                                    s: x.m ? 's' : 'b',
+                                    ex: 'Binance',
+                                    id: seq++
+                                });
+                                added++
+                            }
+                        }
+                        );
+                        orders.sort( (x, y) => x.t - y.t);
+                        id = a[a.length - 1].a + 1;
+                        if (a[a.length - 1].T >= sessionStart || a.length < 1000)
+                            break
+                    }
+                } catch (e) {}
+                if (added)
+                    $('note').textContent += ` · backfilled ${added.toLocaleString()} from Binance`;
+            }
+
+            // ---------- data ----------
+            async function loadHistory(my) {
+                try {
+                    const ctl = new AbortController()
+                      , to = setTimeout( () => ctl.abort(), 5000);
+                    const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${iv}&limit=500`, {
+                        signal: ctl.signal
+                    });
+                    clearTimeout(to);
+                    if (!r.ok)
+                        throw 0;
+                    const a = await r.json();
+                    if (my !== gen)
+                        return;
+                    candles = a.map(k => ({
+                        t: k[0],
+                        o: +k[1],
+                        h: +k[2],
+                        l: +k[3],
+                        c: +k[4],
+                        v: +k[5]
+                    }));
+                } catch (e) {}
+            }
+            function start() {
+                const my = ++gen;
+                setStatus('', 'Connecting…');
+                loadHistory(my);
+                EX.forEach(e => {
+                    e.on = 0;
+                    connectEx(e, my)
+                }
+                );
+                if (lastSeen && sessionStart - lastSeen > 15000 && sessionStart - lastSeen < 1728e5)
+                    backfill(my, lastSeen + 1);
+                setTimeout( () => {
+                    if (my === gen && !got)
+                        demo(my)
+                }
+                , 7000);
+            }
+            function connectEx(e, my) {
+                let w;
+                try {
+                    w = new WebSocket(e.url)
+                } catch (x) {
+                    return
+                }
+                e.ws = w;
+                w.onopen = () => {
+                    e.on = 1;
+                    if (e.sub)
+                        w.send(JSON.stringify(e.sub));
+                    if (e.ping)
+                        e.pt = setInterval( () => w.readyState === 1 && w.send(e.ping), 20000)
+                }
+                ;
+                w.onmessage = m => {
+                    if (my !== gen)
+                        return;
+                    let d;
+                    try {
+                        d = JSON.parse(m.data)
+                    } catch (x) {
+                        return
+                    }
+                    e.parse(d).forEach(t => {
+                        if (t.q > 0 && t.p > 0) {
+                            got = true;
+                            trade(e.n, t, e.n === 'Binance' || Date.now() - lastBin > 5000)
+                        }
+                    }
+                    )
+                }
+                ;
+                w.onclose = () => {
+                    e.on = 0;
+                    clearInterval(e.pt);
+                    if (my === gen)
+                        setTimeout( () => my === gen && connectEx(e, my), 3000)
+                }
+                ;
+            }
+            function trade(ex, t, ref) {
+                const now = Date.now()
+                  , step = MS[iv];
+                t.t = now;
+                t.ex = ex;
+                t.id = seq++;
+                lastSeen = now;
+                if (ex === 'Binance')
+                    lastBin = now;
+                flow.push(t);
+                if (flow.length > 80000)
+                    flow.splice(0, 20000);
+                if (ref) {
+                    const ct = Math.floor(now / step) * step;
+                    let c = candles[candles.length - 1];
+                    if (!c || c.t < ct) {
+                        c = {
+                            t: ct,
+                            o: t.p,
+                            h: t.p,
+                            l: t.p,
+                            c: t.p,
+                            v: 0
+                        };
+                        candles.push(c);
+                        if (candles.length > 1500)
+                            candles.shift()
+                    }
+                    c.h = Math.max(c.h, t.p);
+                    c.l = Math.min(c.l, t.p);
+                    c.c = t.p;
+                    c.v += t.q;
+                    price(t.p)
+                }
+                if (t.q >= MIN) {
+                    orders.push(t);
+                    if (orders.length > MAXO)
+                        orders.splice(0, 2000)
+                }
+                if (t.q >= thr)
+                    tq.push(t);
+            }
+            function price(p) {
+                const el = $('px');
+                el.textContent = fmt(p);
+                if (lastPx !== null && p !== lastPx)
+                    el.className = p > lastPx ? 'up' : 'down';
+                lastPx = p
+            }
+            // fallback so the UI still works when exchanges can't be reached (deterministic price path so saved demo circles line up after a reload)
+            const DP = t => 65000 + 400 * Math.sin(t / 9e5) + 150 * Math.sin(t / 1.3e5) + 40 * Math.sin(t / 17000);
+            function demo(my) {
+                if (my !== gen)
+                    return;
+                EX.forEach(e => {
+                    try {
+                        e.ws.onclose = null;
+                        e.ws.close()
+                    } catch (x) {}
+                }
+                );
+                setStatus('demo', 'Demo data · exchanges unreachable');
+                key = KEY + '.demo';
+                orders = [];
+                tq = [];
+                lastSeen = 0;
+                $('note').textContent = '';
+                restore();
+                const step = MS[iv]
+                  , t0 = Math.floor(Date.now() / step) * step - 299 * step;
+                candles = [];
+                for (let i = 0; i < 300; i++) {
+                    const t = t0 + i * step
+                      , ps = [];
+                    for (let k = 0; k <= 12; k++)
+                        ps.push(DP(t + k * step / 12) + Math.sin(k * 7 + i * 3) * 8);
+                    candles.push({
+                        t,
+                        o: ps[0],
+                        h: Math.max(...ps),
+                        l: Math.min(...ps),
+                        c: ps[12],
+                        v: 30 + 40 * Math.abs(Math.sin(i))
+                    })
+                }
+                setInterval( () => {
+                    if (my !== gen)
+                        return;
+                    const bias = Math.sin(Date.now() / 25000) * .25;
+                    for (let i = 0; i < 1 + Math.floor(Math.random() * 3); i++) {
+                        const s = Math.random() < .5 - bias ? 'b' : 's'
+                          , big = Math.random() < .05
+                          , q = big ? .4 + Math.random() * 3 : Math.exp(Math.random() * Math.random() * 3 - 3.2);
+                        trade(EX[Math.floor(Math.random() * 5)].n, {
+                            p: Math.round((DP(Date.now()) + (Math.random() - .5) * 10) * 100) / 100,
+                            q,
+                            s
+                        }, true)
+                    }
+                }
+                , 120);
+            }
+
+            // ---------- side panel (4 Hz) ----------
+            function update() {
+                const W = +$('win').value * 1000
+                  , now = Date.now();
+                let b = 0
+                  , s = 0;
+                const ex = {};
+                EX.forEach(e => ex[e.n] = {
+                    b: 0,
+                    s: 0
+                });
+                for (let i = flow.length - 1; i >= 0; i--) {
+                    const t = flow[i];
+                    if (now - t.t > W)
+                        break;
+                    t.s === 'b' ? b += t.q : s += t.q;
+                    ex[t.ex][t.s] += t.q
+                }
+                S = {
+                    b,
+                    s
+                };
+                const T = b + s
+                  , pc = T ? b / T * 100 : 50
+                  , net = b - s;
+                $('rb').style.width = pc + '%';
+                $('rs').style.width = (100 - pc) + '%';
+                $('bp').textContent = 'Buy ' + pc.toFixed(1) + '%';
+                $('sp').textContent = 'Sell ' + (100 - pc).toFixed(1) + '%';
+                $('exs').innerHTML = EX.map(e => {
+                    const x = ex[e.n]
+                      , t = x.b + x.s
+                      , p = t ? x.b / t * 100 : 50
+                      , nt = x.b - x.s;
+                    return `<div class="ex"><span><i class="dot ${e.on ? 'live' : ''}"></i> ${e.n}</span><div class="m"><i style="width:${p}%;background:var(--buy)"></i><i style="width:${100 - p}%;background:var(--sell)"></i></div><em class="${nt >= 0 ? 'g' : 'r'}">${nt >= 0 ? '+' : ''}${nt.toFixed(2)}</em></div>`
+                }
+                ).join('');
+                const on = EX.filter(e => e.on).length;
+                if (!$('dot').classList.contains('demo'))
+                    setStatus(on ? 'live' : '', on ? `Live · ${on}/${EX.length} exchanges` : 'Connecting…');
+                $('chg').textContent = got ? `Net flow ${net >= 0 ? '+' : ''}${net.toFixed(2)} BTC (${$('win').selectedOptions[0].text})` : 'Waiting for trades';
+                $('chg').style.color = net >= 0 ? 'var(--buy)' : 'var(--sell)';
+                if (tq.length) {
+                    const tp = $('tape')
+                      , fr = document.createDocumentFragment()
+                      , mq = Math.max(thr * 4, ...tq.map(t => t.q));
+                    tq.slice(-25).forEach(t => {
+                        if (t.q < thr)
+                            return;
+                        const r = document.createElement('div')
+                          , k = Math.sqrt(Math.min(1, t.q / mq))
+                          , sz = 8 + 14 * k;
+                        r.className = 'row ' + t.s;
+                        r.innerHTML = `<span class="c"><i style="width:${sz}px;height:${sz}px;background:${colr(t.s === 'b', k, .35, 1)};box-shadow:0 0 ${6 * k}px ${colr(t.s === 'b', 1, 0, .8)}"></i></span><span>${new Date(t.t).toTimeString().slice(0, 8)}</span><span>${t.ex} ${t.q.toFixed(3)}</span><span>${fmt(t.p, 1)}</span>`;
+                        fr.prepend(r)
+                    }
+                    );
+                    tq = [];
+                    tp.prepend(fr);
+                    while (tp.children.length > 60)
+                        tp.lastChild.remove()
+                }
+                $('bc').textContent = orders.reduce( (a, o) => a + (o.q >= thr), 0).toLocaleString();
+            }
+
+            // ---------- chart ----------
+            const cv = $('cv')
+              , cx = cv.getContext('2d');
+            let W = 0
+              , H = 0;
+            new ResizeObserver( () => {
+                const r = fit(cv);
+                W = r.width;
+                H = r.height
+            }
+            ).observe(cv);
+            const clampOff = () => {
+                off = Math.max(0, Math.min(candles.length - 20, off))
+            }
+            ;
+            cv.addEventListener('wheel', e => {
+                e.preventDefault();
+                n = Math.round(Math.max(20, Math.min(500, n * (e.deltaY > 0 ? 1.1 : .9))))
+            }
+            , {
+                passive: false
+            });
+            let drag = null;
+            cv.addEventListener('pointerdown', e => {
+                drag = {
+                    x: e.clientX,
+                    off
+                };
+                cv.setPointerCapture(e.pointerId)
+            }
+            );
+            cv.addEventListener('pointerup', () => drag = null);
+            cv.addEventListener('pointermove', e => {
+                const r = cv.getBoundingClientRect();
+                mouse = {
+                    x: e.clientX - r.left,
+                    y: e.clientY - r.top
+                };
+                if (drag) {
+                    off = drag.off + (e.clientX - drag.x) / ((W - 72) / n);
+                    clampOff()
+                }
+            }
+            );
+            cv.addEventListener('pointerleave', () => mouse = null);
+            cv.addEventListener('dblclick', () => {
+                n = 120;
+                off = 0
+            }
+            );
+            function niceStep(r) {
+                const p = Math.pow(10, Math.floor(Math.log10(r)))
+                  , f = r / p;
+                return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p
+            }
+            function tlabel(t) {
+                const d = new Date(t);
+                return MS[iv] >= 864e5 || (d.getHours() === 0 && d.getMinutes() === 0) ? d.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                }) : d.toTimeString().slice(0, 5)
+            }
+            function draw() {
+                requestAnimationFrame(draw);
+                cx.clearRect(0, 0, W, H);
+                if (!candles.length) {
+                    cx.fillStyle = '#7a8799';
+                    cx.font = '13px Manrope,sans-serif';
+                    cx.fillText('Loading chart…', 20, 30);
+                    return
+                }
+                const axW = 72
+                  , padT = 10
+                  , padB = 24
+                  , pw = W - axW
+                  , volH = Math.round((H - padT - padB) * .14)
+                  , ph = H - padT - padB - volH - 6
+                  , step = MS[iv];
+                const end = candles.length - Math.round(off)
+                  , start = Math.max(0, end - n)
+                  , vis = candles.slice(start, end);
+                if (!vis.length)
+                    return;
+                let hiP = -Infinity
+                  , loP = Infinity
+                  , vmax = 0;
+                vis.forEach(c => {
+                    hiP = Math.max(hiP, c.h);
+                    loP = Math.min(loP, c.l);
+                    vmax = Math.max(vmax, c.v)
+                }
+                );
+                const pad = (hiP - loP) * .14 || 1;
+                hiP += pad;
+                loP -= pad;
+                const cw = pw / n
+                  , Y = p => padT + (hiP - p) / (hiP - loP) * ph
+                  , X = j => pw - (vis.length - j - .5) * cw
+                  , volBase = padT + ph + 6 + volH;
+                cx.font = '11px JetBrains Mono,monospace';
+                cx.textBaseline = 'middle';
+                cx.textAlign = 'left';
+                cx.lineWidth = 1;
+                const st = niceStep((hiP - loP) / 7);
+                for (let p = Math.ceil(loP / st) * st; p < hiP; p += st) {
+                    const y = Math.round(Y(p)) + .5;
+                    cx.strokeStyle = '#151d29';
+                    cx.beginPath();
+                    cx.moveTo(0, y);
+                    cx.lineTo(pw, y);
+                    cx.stroke();
+                    cx.fillStyle = '#7a8799';
+                    cx.fillText(fmt(p, st < 1 ? 2 : 0), pw + 8, y)
+                }
+                const every = Math.max(1, Math.ceil(90 / cw));
+                cx.textAlign = 'center';
+                vis.forEach( (c, j) => {
+                    if ((start + j) % every)
+                        return;
+                    const x = X(j);
+                    if (x < 24 || x > pw - 24)
+                        return;
+                    cx.strokeStyle = '#151d29';
+                    cx.beginPath();
+                    cx.moveTo(Math.round(x) + .5, padT);
+                    cx.lineTo(Math.round(x) + .5, padT + ph);
+                    cx.stroke();
+                    cx.fillStyle = '#7a8799';
+                    cx.fillText(tlabel(c.t), x, H - 10)
+                }
+                );
+                const bw = Math.max(1, cw * .7);
+                vis.forEach( (c, j) => {
+                    const x = X(j)
+                      , col = c.c >= c.o ? '#00F090' : '#FF3B5C'
+                      , vh = vmax ? c.v / vmax * volH : 0;
+                    cx.globalAlpha = .3;
+                    cx.fillStyle = col;
+                    cx.fillRect(x - bw / 2, volBase - vh, bw, vh);
+                    cx.globalAlpha = 1;
+                    cx.strokeStyle = col;
+                    cx.fillStyle = col;
+                    cx.beginPath();
+                    cx.moveTo(Math.round(x) + .5, Y(c.h));
+                    cx.lineTo(Math.round(x) + .5, Y(c.l));
+                    cx.stroke();
+                    const yo = Y(c.o)
+                      , yc = Y(c.c);
+                    cx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1.5, Math.abs(yo - yc)))
+                }
+                );
+                // BIG-TRADE circles (only orders >= threshold, all exchanges, per candle + side):
+                // sells press down from the TOP of the candle (red), buys push up from the BOTTOM (green). Size + intensity are relative to the largest on screen.
+                const idx = new Map(vis.map( (c, j) => [c.t, j]));
+                agg = new Map();
+                let mv = 0;
+                for (let i = orders.length - 1; i >= 0; i--) {
+                    const o = orders[i];
+                    if (o.t < vis[0].t)
+                        break;
+                    if (o.q < thr)
+                        continue;
+                    const j = idx.get(Math.floor(o.t / step) * step);
+                    if (j === undefined)
+                        continue;
+                    let a = agg.get(j);
+                    if (!a) {
+                        a = {
+                            b: 0,
+                            s: 0,
+                            nb: 0,
+                            ns: 0
+                        };
+                        agg.set(j, a)
+                    }
+                    a[o.s] += o.q;
+                    a['n' + o.s]++;
+                    mv = Math.max(mv, a[o.s])
+                }
+                agg.forEach( (a, j) => ['s', 'b'].forEach(f => {
+                    const v = a[f];
+                    if (!v)
+                        return;
+                    const c = vis[j]
+                      , buy = f === 'b'
+                      , t = Math.sqrt(v / mv)
+                      , r = 4 + Math.min(cw * .3, 6) + 14 * t
+                      , x = X(j)
+                      , y = buy ? Y(c.l) + r * .6 : Y(c.h) - r * .6;
+                    const g = cx.createRadialGradient(x, y - r * .3, r * .1, x, y, r);
+                    g.addColorStop(0, colr(buy, Math.min(1, t + .3), .7, 1));
+                    g.addColorStop(1, colr(buy, t, .4, .95));
+                    cx.shadowColor = colr(buy, 1, 0, .9);
+                    cx.shadowBlur = 6 + 16 * t;
+                    cx.fillStyle = g;
+                    cx.beginPath();
+                    cx.arc(x, y, r, 0, 7);
+                    cx.fill();
+                    cx.shadowBlur = 0;
+                    cx.strokeStyle = 'rgba(255,255,255,.4)';
+                    cx.lineWidth = .9;
+                    cx.stroke();
+                    if (r >= 7) {
+                        const s = r * .38;
+                        cx.fillStyle = 'rgba(5,8,12,.72)';
+                        cx.beginPath();
+                        if (buy) {
+                            cx.moveTo(x, y - s * .9);
+                            cx.lineTo(x + s, y + s * .6);
+                            cx.lineTo(x - s, y + s * .6)
+                        } else {
+                            cx.moveTo(x, y + s * .9);
+                            cx.lineTo(x + s, y - s * .6);
+                            cx.lineTo(x - s, y - s * .6)
+                        }
+                        cx.closePath();
+                        cx.fill()
+                    }
+                }
+                ));
+                const lc = candles[candles.length - 1]
+                  , yl = Y(lc.c)
+                  , lcol = lc.c >= lc.o ? '#00F090' : '#FF3B5C';
+                if (yl > padT && yl < padT + ph) {
+                    cx.setLineDash([4, 4]);
+                    cx.strokeStyle = lcol;
+                    cx.globalAlpha = .7;
+                    cx.beginPath();
+                    cx.moveTo(0, yl);
+                    cx.lineTo(pw, yl);
+                    cx.stroke();
+                    cx.setLineDash([]);
+                    cx.globalAlpha = 1;
+                    cx.fillStyle = lcol;
+                    cx.fillRect(pw, yl - 9, axW, 18);
+                    cx.fillStyle = '#05080c';
+                    cx.textAlign = 'left';
+                    cx.fillText(fmt(lc.c), pw + 6, yl)
+                }
+                let hj = vis.length - 1;
+                if (mouse && mouse.x < pw && mouse.y > padT && mouse.y < padT + ph) {
+                    const j = Math.floor((mouse.x - (pw - vis.length * cw)) / cw);
+                    cx.strokeStyle = '#4a5568';
+                    cx.lineWidth = 1;
+                    cx.setLineDash([3, 3]);
+                    cx.beginPath();
+                    cx.moveTo(0, Math.round(mouse.y) + .5);
+                    cx.lineTo(pw, Math.round(mouse.y) + .5);
+                    cx.stroke();
+                    if (j >= 0 && j < vis.length) {
+                        hj = j;
+                        const x = Math.round(X(j)) + .5;
+                        cx.beginPath();
+                        cx.moveTo(x, padT);
+                        cx.lineTo(x, padT + ph + volH + 6);
+                        cx.stroke()
+                    }
+                    cx.setLineDash([]);
+                    cx.fillStyle = '#2a3546';
+                    cx.fillRect(pw, mouse.y - 9, axW, 18);
+                    cx.fillStyle = '#d8e0ec';
+                    cx.textAlign = 'left';
+                    cx.fillText(fmt(hiP - (mouse.y - padT) / ph * (hiP - loP)), pw + 6, mouse.y)
+                }
+                const hc = vis[hj]
+                  , a = agg.get(hj) || {
+                    b: 0,
+                    s: 0,
+                    nb: 0,
+                    ns: 0
+                }
+                  , el = $('ohlc');
+                el.className = 'ohlc ' + (hc.c >= hc.o ? 'up' : 'down');
+                el.textContent = `${tlabel(hc.t)}  O ${fmt(hc.o)}  H ${fmt(hc.h)}  L ${fmt(hc.l)}  C ${fmt(hc.c)}  |  Big buys ${a.b.toFixed(2)} BTC (${a.nb})  Big sells ${a.s.toFixed(2)} BTC (${a.ns})`;
+            }
+            restore();
+            mark();
+            start();
+            setInterval(update, 250);
+            requestAnimationFrame(draw);
+        </script>
+    </body>
+</html>
